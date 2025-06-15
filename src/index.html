@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNO Game</title>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>UNO Game</h1>
+            <div class="game-controls">
+                <button id="start-game">Start New Game</button>
+                <select id="game-type">
+                    <option value="standard">Standard UNO</option>
+                    <option value="quick">Quick UNO</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="game-board">
+            <div class="opponents-container">
+                <!-- Opponent hands will be dynamically added here -->
+            </div>
+
+            <div class="middle-section">
+                <div class="deck-area">
+                    <div id="deck" class="deck">
+                        <!-- Deck of cards -->
+                    </div>
+                    <div id="discard-pile" class="discard-pile">
+                        <!-- Discard pile -->
+                    </div>
+                </div>
+                <div class="game-info">
+                    <div id="current-player">Current Player: </div>
+                    <div id="game-direction">Direction: Clockwise</div>
+                    <div id="game-status">Game Status: Not Started</div>
+                </div>
+            </div>
+
+            <div class="player-hand-container">
+                <h2>Your Hand</h2>
+                <div id="player-hand" class="player-hand">
+                    <!-- Player's cards will be dynamically added here -->
+                </div>
+                <div class="player-actions">
+                    <button id="draw-card" disabled>Draw Card</button>
+                    <button id="call-uno" disabled>Call UNO!</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="game-log">
+            <h3>Game Log</h3>
+            <div id="log-container" class="log-container">
+                <!-- Game events will be logged here -->
+            </div>
+        </div>
+    </div>
+</body>
+</html>
