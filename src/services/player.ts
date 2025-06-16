@@ -1,11 +1,14 @@
 import { Card, CardColor } from './cards';
+import { PlayerStrategy } from './playerStrategy';
 
 export class Player {
     private hand: Card[] = [];
     private name: string;
+    private strategy?: PlayerStrategy;
 
-    constructor(name: string) {
+    constructor(name: string, strategy?: PlayerStrategy) {
         this.name = name;
+        this.strategy = strategy;
     }
 
     getName(): string {
@@ -13,7 +16,11 @@ export class Player {
     }
 
     getHand(): Card[] {
-        return [...this.hand]; // Return a copy to prevent direct modification
+        // Devuelve la referencia real SOLO para CpuPlayer, copia para el resto
+        if (this.constructor.name === 'CpuPlayer') {
+            return this.hand;
+        }
+        return [...this.hand];
     }
 
     getCardCount(): number {
@@ -126,5 +133,15 @@ export class Player {
     // Clear the player's hand
     clearHand(): void {
         this.hand = [];
+    }
+
+    setStrategy(strategy: PlayerStrategy) {
+        this.strategy = strategy;
+    }
+
+    makeMove(game: any) {
+        if (this.strategy) {
+            this.strategy.makeMove(game, this);
+        }
     }
 }

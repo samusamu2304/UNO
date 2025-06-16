@@ -1,3 +1,6 @@
+import { Game } from './game';
+import reverseImage from '../assets/cardIcons/arrow_reverse_icon.svg';
+
 export enum CardColor {
     RED = 'red',
     BLUE = 'blue',
@@ -23,7 +26,8 @@ export abstract class Card {
     protected constructor(
         protected readonly color: CardColor,
         protected readonly value: string,
-        protected readonly type: CardType
+        protected readonly type: CardType,
+        protected readonly imageURL? : string
     ) {}
 
     getColor(): CardColor {
@@ -38,12 +42,44 @@ export abstract class Card {
         return this.type;
     }
 
+    hasImage(): boolean {
+        return !!this.imageURL;
+    }
+
+    getImageURL(): string {
+        return this.imageURL || '';
+    }
+    toCardElement(): HTMLElement {
+        const cardElement = document.createElement('div');
+        cardElement.className = 'card';
+
+        // Añadir clase de color
+        cardElement.classList.add(`card-${this.getColor()}`);
+
+
+        // Imagen si existe
+        if (this.hasImage()) {
+            const iconElement = document.createElement('img');
+            iconElement.src = this.getImageURL();
+            iconElement.className = 'card-icon';
+            cardElement.appendChild(iconElement);
+        } else {
+            // Si no hay imagen, mostrar el valor como texto
+            const textElement = document.createElement('span');
+            textElement.textContent = this.getValue();
+            cardElement.appendChild(textElement);
+        }
+
+        return cardElement;
+    }
+
     abstract canPlayOn(topCard: Card): boolean;
     abstract playEffect(game: Game): void;
 
     toString(): string {
         return `${this.color} ${this.value}`;
     }
+
 }
 
 export class NumberCard extends Card {
@@ -60,6 +96,7 @@ export class NumberCard extends Card {
     playEffect(game: Game): void {
         // Number cards have no special effect
     }
+
 }
 
 export class SkipCard extends Card {
@@ -80,7 +117,7 @@ export class SkipCard extends Card {
 
 export class ReverseCard extends Card {
     constructor(color: CardColor) {
-        super(color, 'REVERSE', CardType.REVERSE);
+        super(color, 'REVERSE', CardType.REVERSE, reverseImage);
     }
 
     canPlayOn(topCard: Card): boolean {
@@ -96,7 +133,7 @@ export class ReverseCard extends Card {
 
 export class DrawTwoCard extends Card {
     constructor(color: CardColor) {
-        super(color, 'DRAW TWO', CardType.DRAW_TWO);
+        super(color, '+2', CardType.DRAW_TWO);
     }
 
     canPlayOn(topCard: Card): boolean {
@@ -105,7 +142,8 @@ export class DrawTwoCard extends Card {
                topCard.getColor() === CardColor.WILD;
     }
 
-    playEffect(game: Game): void {
+    playEffect(game: any): void {
+        // Aplica el efecto automáticamente
         game.nextPlayerDraws(2);
         game.skipNextPlayer();
     }
@@ -115,7 +153,7 @@ export class WildCard extends Card {
     private newColor: CardColor | null = null;
 
     constructor() {
-        super(CardColor.WILD, 'WILD', CardType.WILD);
+        super(CardColor.WILD, '', CardType.WILD);
     }
 
     canPlayOn(topCard: Card): boolean {
@@ -124,9 +162,7 @@ export class WildCard extends Card {
     }
 
     setColor(color: CardColor): void {
-        if (color !== CardColor.WILD) {
             this.newColor = color;
-        }
     }
 
     getColor(): CardColor {
@@ -134,7 +170,20 @@ export class WildCard extends Card {
     }
 
     playEffect(game: Game): void {
-        // The effect is just changing the color, which is handled by setColor
+        // Para wild cards, pedir color al jugador actual
+        const currentPlayer = game.getCurrentPlayer();
+        const chosenColor = currentPlayer.chooseColor();
+        this.setColor(chosenColor);
+    }
+
+    toCardElement(): HTMLElement {
+        const cardElement = super.toCardElement();
+        if (!this.newColor) {
+            cardElement.classList.add('grid-bg');
+        } else {
+            cardElement.classList.remove('grid-bg');
+        }
+        return cardElement;
     }
 }
 
@@ -148,18 +197,14 @@ export class WildDrawFourCard extends WildCard {
     }
 
     getValue(): string {
-        return 'WILD DRAW FOUR';
+        return '+4';
     }
 
     playEffect(game: Game): void {
+        // Pedir color y aplicar efecto automáticamente
+        super.playEffect(game);
         game.nextPlayerDraws(4);
         game.skipNextPlayer();
     }
 }
 
-// Forward declaration for the Game interface used by card effects
-export interface Game {
-    skipNextPlayer(): void;
-    reverseDirection(): void;
-    nextPlayerDraws(count: number): void;
-}

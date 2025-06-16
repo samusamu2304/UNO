@@ -1,7 +1,6 @@
 import { Card, CardColor, WildCard } from './cards';
 import { Deck, DeckFactory, StandardUNODeckFactory } from './deck';
 import { Player } from './player';
-import { Direction, GameRules, GameState, StandardUNORules } from './gameRules';
 
 export enum GameEvent {
     GAME_START = 'game_start',
@@ -16,13 +15,28 @@ export enum GameEvent {
 
 export type GameEventListener = (event: GameEvent, data: any) => void;
 
+export enum Direction {
+    CLOCKWISE = 1,
+    COUNTER_CLOCKWISE = -1
+}
+
+export interface GameState {
+    players: Player[];
+    currentPlayerIndex: number;
+    direction: Direction;
+    deck: Deck;
+    skipNextPlayer(): void;
+    reverseDirection(): void;
+    nextPlayerDraws(count: number): void;
+    getCurrentPlayer(): Player;
+    getNextPlayer(): Player;
+}
 export class Game implements GameState {
     players: Player[] = [];
     currentPlayerIndex: number = 0;
     direction: Direction = Direction.CLOCKWISE;
     deck: Deck;
     private topCard: Card | null = null;
-    private rules: GameRules;
     private deckFactory: DeckFactory;
     private eventListeners: GameEventListener[] = [];
     private skipFlag: boolean = false;
@@ -31,11 +45,9 @@ export class Game implements GameState {
 
     constructor(
         players: Player[] = [],
-        rules: GameRules = new StandardUNORules(),
         deckFactory: DeckFactory = new StandardUNODeckFactory()
     ) {
         this.players = players;
-        this.rules = rules;
         this.deckFactory = deckFactory;
         this.deck = this.deckFactory.createDeck();
     }
@@ -68,7 +80,7 @@ export class Game implements GameState {
         this.deck = this.deckFactory.createDeck();
 
         // Deal initial cards to players
-        const initialCardCount = this.rules.initialCardCount();
+        const initialCardCount = 7; // Valor por defecto UNO
         for (const player of this.players) {
             const cards = this.deck.drawMultiple(initialCardCount);
             player.addCards(cards);
@@ -112,6 +124,15 @@ export class Game implements GameState {
             player: currentPlayer,
             topCard: this.topCard
         });
+
+        // Delegar la jugada al strategy del jugador (patrón Strategy)
+        if (typeof currentPlayer.makeMove === 'function' && currentPlayer["strategy"]) {
+            setTimeout(() => {
+                if (this.getCurrentPlayer() === currentPlayer && !this.gameOver) {
+                    currentPlayer.makeMove(this);
+                }
+            }, 700);
+        }
     }
 
     // Player actions
@@ -123,7 +144,7 @@ export class Game implements GameState {
         const currentPlayer = this.getCurrentPlayer();
 
         // Check if the card can be played
-        if (!this.topCard || !this.rules.canPlayCard(card, this.topCard, currentPlayer)) {
+        if (!this.topCard || !card.canPlayOn(this.topCard)) {
             return false;
         }
 
@@ -133,8 +154,8 @@ export class Game implements GameState {
             return false; // Player doesn't have the card
         }
 
-        // Apply the card's effect
-        this.rules.handleCardPlay(playedCard, currentPlayer, this);
+        // Aplicar el efecto de la carta directamente
+        playedCard.playEffect(this);
 
         // Update the top card
         this.deck.discard(playedCard);
@@ -227,11 +248,7 @@ export class Game implements GameState {
     }
 
     getNextPlayer(): Player {
-        const nextIndex = this.rules.getNextPlayerIndex(
-            this.currentPlayerIndex,
-            this.players.length,
-            this.direction
-        );
+        let nextIndex = (this.currentPlayerIndex + this.direction + this.players.length) % this.players.length;
         return this.players[nextIndex];
     }
 
@@ -241,20 +258,12 @@ export class Game implements GameState {
 
     // Move to the next player's turn
     private nextTurn(): void {
-        // Calculate the next player index
-        let nextIndex = this.rules.getNextPlayerIndex(
-            this.currentPlayerIndex,
-            this.players.length,
-            this.direction
-        );
+        // Calcular el siguiente índice de jugador
+        let nextIndex = (this.currentPlayerIndex + this.direction + this.players.length) % this.players.length;
 
-        // If the skip flag is set, skip the next player
+        // Si el flag de skip está activo, saltar un jugador
         if (this.skipFlag) {
-            nextIndex = this.rules.getNextPlayerIndex(
-                nextIndex,
-                this.players.length,
-                this.direction
-            );
+            nextIndex = (nextIndex + this.direction + this.players.length) % this.players.length;
             this.skipFlag = false;
         }
 
@@ -264,13 +273,34 @@ export class Game implements GameState {
 
     // Check if a player has won
     private checkWinCondition(): boolean {
-        const winner = this.rules.checkWinCondition(this.players);
+        const winner = this.players.find(player => player.getHand().length === 0);
 
         if (winner) {
             this.winner = winner;
             this.gameOver = true;
 
-            const score = this.rules.calculateScore(winner, this.players);
+            // Calcular el puntaje sumando las cartas restantes de los oponentes
+            let score = 0;
+            for (const player of this.players) {
+                if (player !== winner) {
+                    score += player.getHand().reduce((acc, card) => {
+                        // Asignar valores según el tipo de carta
+                        switch (card.getType()) {
+                            case 'number':
+                                return acc + parseInt(card.getValue(), 10);
+                            case 'skip':
+                            case 'reverse':
+                            case 'draw_two':
+                                return acc + 20;
+                            case 'wild':
+                            case 'wild_draw_four':
+                                return acc + 50;
+                            default:
+                                return acc;
+                        }
+                    }, 0);
+                }
+            }
 
             this.emitEvent(GameEvent.GAME_END, {
                 winner: winner,

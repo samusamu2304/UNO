@@ -74,8 +74,8 @@ body {
 }
 
 .deck, .discard-pile {
-    width: 120px;
-    height: 180px;
+    width: 100px;
+    height: 150px;
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     position: relative;
@@ -140,7 +140,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 24px;
+    font-size: 48px;
     font-weight: bold;
     color: white;
     position: relative;
@@ -222,4 +222,22 @@ select {
     padding: 8px;
     border-radius: 4px;
     border: none;
+}
+
+.card-icon {
+    width: 60%;
+    height: auto;
+    margin-right: 5px;
+}
+
+.div-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    user-select: none;
+}
+
+.grid-bg {
+    background:
+            linear-gradient(to right, #e74c3c 50%, #3498db 50%) top / 100% 50% no-repeat,
+            linear-gradient(to right, #f1c40f 50%, #2ecc71 50%) bottom / 100% 50% no-repeat;
 }

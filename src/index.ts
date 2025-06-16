@@ -1,9 +1,12 @@
 import { Game, GameEvent } from './services/game';
 import { Player } from './services/player';
-import { StandardUNORules, QuickUNORules } from './services/gameRules';
 import { StandardUNODeckFactory, SmallUNODeckFactory } from './services/deck';
 import { Card, CardColor, CardType, WildCard } from './services/cards';
+import { CpuPlayer } from './services/cpuPlayer';
 import './styles.css';
+import { Logger } from './services/logging';
+
+
 
 // UI Controller class to handle the interaction between the UI and the game logic
 class UnoGameUI {
@@ -16,28 +19,37 @@ class UnoGameUI {
     constructor() {
         this.humanPlayer = new Player('You');
         this.setupEventListeners();
+        // Escuchar eventos de log y actualizar el DOM
+        window.addEventListener('log-message', (e: any) => {
+            const logContainer = document.getElementById('log-container');
+            if (logContainer) {
+                const logEntry = document.createElement('div');
+                logEntry.className = 'log-entry';
+                logEntry.textContent = e.detail;
+                logContainer.appendChild(logEntry);
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        });
     }
 
     // Initialize the game
     private initGame(gameType: 'standard' | 'quick'): void {
-        // Create opponents
+        // Crear oponentes CPU usando la nueva clase
         this.opponents = [
-            new Player('Computer 1'),
-            new Player('Computer 2'),
-            new Player('Computer 3')
+            new CpuPlayer('Computer 1'),
+            new CpuPlayer('Computer 2'),
+            new CpuPlayer('Computer 3')
         ];
 
-        // Create the game with the selected rules and deck
+        // Crear el juego solo con los jugadores y la baraja
         if (gameType === 'standard') {
             this.game = new Game(
                 [this.humanPlayer, ...this.opponents],
-                new StandardUNORules(),
                 new StandardUNODeckFactory()
             );
         } else {
             this.game = new Game(
                 [this.humanPlayer, ...this.opponents],
-                new QuickUNORules(),
                 new SmallUNODeckFactory()
             );
         }
@@ -115,13 +127,14 @@ class UnoGameUI {
             case GameEvent.TURN_START:
                 this.updateGameInfo();
                 this.enablePlayerActions(data.player === this.humanPlayer);
-
-                // Handle computer player turns automatically
-                if (data.player !== this.humanPlayer && this.game) {
-                    // Add a small delay to make the computer's move visible
+                // Si es CPU, forzar jugada desde la UI (workaround)
+                if (data.player !== this.humanPlayer && typeof data.player.makeMove === 'function') {
                     setTimeout(() => {
-                        this.makeComputerMove(data.player);
-                    }, 1000);
+                        // Verifica que sigue siendo el turno del mismo jugador
+                        if (this.game && this.game.getCurrentPlayer() === data.player) {
+                            data.player.makeMove(this.game);
+                        }
+                    }, 700);
                 }
                 break;
 
@@ -191,11 +204,24 @@ class UnoGameUI {
 
             // Create card backs for each card in the opponent's hand
             const cardCount = opponent.getCardCount();
+            const maxWidth = 250; // ancho máximo del área de cartas del oponente (ajusta según tu diseño)
+            const cardWidth = 100; // ancho de cada carta (igual que en CSS)
+            const minOverlap = 20; // solapamiento mínimo entre cartas
             for (let i = 0; i < cardCount; i++) {
                 const cardElement = document.createElement('div');
                 cardElement.className = 'card';
                 cardElement.style.backgroundColor = '#2980b9';
-                cardElement.style.marginLeft = i > 0 ? '-50px' : '0';
+
+                // Calcular el margen para que no se desborde
+                let overlap = cardWidth - minOverlap;
+                if (cardCount > 1) {
+                    overlap = Math.max(
+                        cardWidth - (maxWidth / (cardCount - 1)),
+                        minOverlap
+                    );
+                }
+                cardElement.style.marginLeft = i > 0 ? `-${overlap}px` : '0';
+
                 cardsElement.appendChild(cardElement);
             }
 
@@ -249,35 +275,7 @@ class UnoGameUI {
 
     // Create a card element
     private createCardElement(card: Card): HTMLElement {
-        const cardElement = document.createElement('div');
-        cardElement.className = 'card';
-
-        // Add color class
-        switch (card.getColor()) {
-            case CardColor.RED:
-                cardElement.classList.add('card-red');
-                break;
-            case CardColor.BLUE:
-                cardElement.classList.add('card-blue');
-                break;
-            case CardColor.GREEN:
-                cardElement.classList.add('card-green');
-                break;
-            case CardColor.YELLOW:
-                cardElement.classList.add('card-yellow');
-                break;
-            case CardColor.WILD:
-                cardElement.classList.add('card-wild');
-                break;
-        }
-
-        // Add card value
-        const valueElement = document.createElement('div');
-        valueElement.className = 'card-value';
-        valueElement.textContent = card.getValue();
-        cardElement.appendChild(valueElement);
-
-        return cardElement;
+        return card.toCardElement()
     }
 
     // Handle card click
@@ -422,53 +420,19 @@ class UnoGameUI {
         }
     }
 
-    // Make a move for a computer player
-    private makeComputerMove(player: Player): void {
-        if (!this.game) return;
-
-        const topCard = this.game.getTopCard();
-        if (!topCard) return;
-
-        // Find a playable card
-        const playableCard = player.findPlayableCard(topCard);
-
-        if (playableCard) {
-            // If it's a wild card, set a color
-            if (playableCard.getColor() === CardColor.WILD) {
-                const chosenColor = player.chooseColor();
-                if (playableCard instanceof WildCard) {
-                    playableCard.setColor(chosenColor);
-                }
-            }
-
-            // Play the card
-            this.game.playCard(playableCard);
-        } else {
-            // Draw a card if no playable card is found
-            const drawnCard = this.game.drawCard();
-
-            // If the drawn card can be played, play it
-            if (drawnCard && drawnCard.canPlayOn(topCard)) {
-                // If it's a wild card, set a color
-                if (drawnCard.getColor() === CardColor.WILD) {
-                    const chosenColor = player.chooseColor();
-                    if (drawnCard instanceof WildCard) {
-                        drawnCard.setColor(chosenColor);
-                    }
-                }
-
-                // Play the drawn card
-                setTimeout(() => {
-                    if (this.game) {
-                        this.game.playCard(drawnCard);
-                    }
-                }, 1000);
-            }
-        }
-    }
-
     // Enable/disable player actions
     private enablePlayerActions(enable: boolean): void {
+
+        const playerHandElement = document.getElementById('player-hand');
+        const cardElements = playerHandElement ? Array.from(playerHandElement.children) : [];
+        for (const cardElement of cardElements) {
+            if (enable) {
+                cardElement.classList.remove('div-disabled');
+            } else {
+                cardElement.classList.add('div-disabled');
+            }
+        }
+
         const drawCardButton = document.getElementById('draw-card') as HTMLButtonElement;
         if (drawCardButton) {
             drawCardButton.disabled = !enable;
@@ -492,14 +456,7 @@ class UnoGameUI {
 
     // Log an event to the game log
     private logEvent(event: string, data: any): void {
-        const logContainer = document.getElementById('log-container');
-        if (!logContainer) return;
-
-        const logEntry = document.createElement('div');
-        logEntry.className = 'log-entry';
-
         let message = '';
-
         if (event === 'info' || event === 'error') {
             message = data.message;
         } else {
@@ -507,15 +464,12 @@ class UnoGameUI {
                 case GameEvent.GAME_START:
                     message = `Game started with ${data.players.length} players. Top card: ${data.topCard.toString()}`;
                     break;
-
                 case GameEvent.TURN_START:
                     message = `${data.player.getName()}'s turn. Top card: ${data.topCard.toString()}`;
                     break;
-
                 case GameEvent.CARD_PLAYED:
                     message = `${data.player.getName()} played ${data.card.toString()}`;
                     break;
-
                 case GameEvent.CARD_DRAWN:
                     if (data.count) {
                         message = `${data.player.getName()} drew ${data.count} cards`;
@@ -523,31 +477,23 @@ class UnoGameUI {
                         message = `${data.player.getName()} drew a card`;
                     }
                     break;
-
                 case GameEvent.UNO_CALLED:
                     message = `${data.player.getName()} called UNO!`;
                     break;
-
                 case GameEvent.DIRECTION_CHANGE:
                     message = `Direction changed to ${data.direction === 1 ? 'clockwise' : 'counter-clockwise'}`;
                     break;
-
                 case GameEvent.PLAYER_SKIPPED:
                     message = `${data.player.getName()} was skipped`;
                     break;
-
                 case GameEvent.GAME_END:
                     message = `Game ended. ${data.winner.getName()} won with a score of ${data.score}`;
                     break;
-
                 default:
                     message = `Unknown event: ${event}`;
             }
         }
-
-        logEntry.textContent = message;
-        logContainer.appendChild(logEntry);
-        logContainer.scrollTop = logContainer.scrollHeight;
+        Logger.getInstance().log(message);
     }
 
     // Clear the UI
@@ -572,9 +518,7 @@ class UnoGameUI {
 
         // Clear the game log
         const logContainer = document.getElementById('log-container');
-        if (logContainer) {
-            logContainer.innerHTML = '';
-        }
+        if (logContainer) logContainer.innerHTML = '';
 
         // Reset game info
         const currentPlayerElement = document.getElementById('current-player');
