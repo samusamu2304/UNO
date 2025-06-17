@@ -322,3 +322,16 @@ select {
         font-weight: bold;
     }
 }
+
+#color-red {
+    background-color: #e74c3c;
+}
+#color-blue {
+    background-color: #3498db;
+}
+#color-green {
+    background-color: #2ecc71;
+}
+#color-yellow {
+    background-color: #f1c40f;
+}
