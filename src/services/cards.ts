@@ -207,17 +207,9 @@ export class WildDrawFourCard extends WildCard {
     }
 
     playEffect(game: GameState): void {
+        super.playEffect(game);
         const currentPlayer = game.getCurrentPlayer();
-        const isHumanPlayer = !(currentPlayer instanceof CpuPlayer);
-
-        if (isHumanPlayer) {
-            this.emitEvent('wild-card-played', {
-                card: this,
-                isHumanPlayer: true
-            });
-        } else {
-            const chosenColor = currentPlayer.chooseColor();
-            this.setColor(chosenColor);
+        if (currentPlayer instanceof CpuPlayer) {
             this.completeEffect(game);
         }
     }

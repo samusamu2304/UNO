@@ -3,7 +3,15 @@ import {Player} from "../services/player";
 import {Direction, GameEvent} from "../services/game";
 
 export enum CardColor { RED = 'red', BLUE = 'blue', GREEN = 'green', YELLOW = 'yellow', WILD = 'wild' }
-export enum CardType { NUMBER = 'number', SKIP = 'skip', REVERSE = 'reverse', DRAW_TWO = 'draw_two', WILD = 'wild', WILD_DRAW_FOUR = 'wild_draw_four', SKIP_TWO = 'skip_two' }
+export enum CardType {
+    NUMBER = 'number',
+    SKIP = 'skip',
+    REVERSE = 'reverse',
+    DRAW_TWO = 'draw_two',
+    WILD = 'wild',
+    WILD_DRAW_FOUR = 'wild_draw_four',
+    SKIP_TWO = 'skip_two',
+}
 
 export interface GameState {
     skipNextPlayer(n : number): void;
