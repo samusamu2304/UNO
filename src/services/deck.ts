@@ -1,5 +1,5 @@
-import { CardColor } from '../types/types';
-import { Card, NumberCard, SkipCard, ReverseCard, DrawTwoCard, WildCard, WildDrawFourCard } from './cards';
+import {CardColor} from '../types/types';
+import {Card, DrawTwoCard, NumberCard, ReverseCard, SkipCard, SkipTwoCard, WildCard, WildDrawFourCard} from './cards';
 
 export interface DeckFactory {
     createDeck(): Deck;
@@ -163,9 +163,14 @@ export class mostlyWildDeckFactory implements DeckFactory {
 
         // Add mostly Wild cards
         for (let i = 0; i < 20; i++) {
-            cards.push(new WildCard());
+            cards.push(new SkipTwoCard(CardColor.RED));
+            cards.push(new SkipTwoCard(CardColor.BLUE));
+            cards.push(new SkipTwoCard(CardColor.GREEN));
+            cards.push(new SkipTwoCard(CardColor.YELLOW));
             cards.push(new WildDrawFourCard());
         }
+
+
 
         // Add a few number cards
         const colors = [CardColor.RED, CardColor.BLUE, CardColor.GREEN, CardColor.YELLOW];

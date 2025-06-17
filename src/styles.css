@@ -47,6 +47,12 @@ body {
 
 .opponent {
     text-align: center;
+    position: relative;
+}
+
+.opponent-name-container {
+    display: flex;
+    justify-content: center;
 }
 
 .opponent-name {
@@ -286,4 +292,33 @@ select {
 .color-button:hover {
     transform: scale(1.1);
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.current-player {
+    color: red;
+}
+
+.opponent-skipped-turns {
+    color: orange;
+    font-weight: bold;
+    display: none;
+    position: absolute;
+    right: 20px;
+}
+
+.has-skipped-turns {
+    display: inline-block;
+}
+
+#player-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    h2 {
+        display: block;
+    }
+    #player-skipped-turns {
+        color: orange;
+        font-weight: bold;
+    }
 }

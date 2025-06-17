@@ -5,6 +5,7 @@ import {CardColor, GameState} from "../types/types";
 export class Player {
     private hand: Card[] = [];
     private name: string;
+    private skippedTurns: number = 0;
     private strategy?: PlayerStrategy;
 
     constructor(name: string, strategy?: PlayerStrategy) {
@@ -34,6 +35,26 @@ export class Player {
 
     addCards(cards: Card[]): void {
         this.hand.push(...cards);
+    }
+
+    getSkippedTurns(): number {
+        return this.skippedTurns;
+    }
+    setSkippedTurns(turns: number): void {
+        this.skippedTurns = turns;
+    }
+    addSkippedTurns(n : number): void {
+        this.skippedTurns += n;
+    }
+    resetSkippedTurns(): void {
+        this.skippedTurns = 0;
+    }
+    consumeSkippedTurn(): boolean {
+        if (this.skippedTurns > 0) {
+            this.skippedTurns--;
+            return true; // Turn consumed
+        }
+        return false; // No skipped turns to consume
     }
 
     // Find a card in the player's hand that can be played on the top card

@@ -143,6 +143,7 @@ class UnoGameUI {
             case GameEvent.TURN_START:
                 this.updateGameInfo();
                 this.enablePlayerActions(data.player === this.humanPlayer);
+                this.renderOpponents()
                 // La lógica de la CPU ahora es manejada internamente por Game.ts en startTurn
                 break;
 
@@ -150,6 +151,7 @@ class UnoGameUI {
                 this.renderTopCard(data.card);
                 this.renderPlayerHand();
                 this.renderOpponents();
+                this.updatePlayerSkippedTurns();
                 break;
 
             case GameEvent.CARD_DRAWN:
@@ -180,7 +182,7 @@ class UnoGameUI {
         }
 
         if (directionElement) {
-            const direction = this.game.direction === 1 ? 'Clockwise' : 'Counter-Clockwise';
+            const direction = this.game.getDirection() === 1 ? 'Clockwise' : 'Counter-Clockwise';
             directionElement.textContent = `Direction: ${direction}`;
         }
 
@@ -201,12 +203,27 @@ class UnoGameUI {
         this.opponents.forEach(opponent => {
             const opponentElement = document.createElement('div');
             opponentElement.className = 'opponent';
-
-            const nameElement = document.createElement('div');
+            const nameContainer = document.createElement('div');
+            nameContainer.className = 'opponent-name-container';
+            opponentElement.appendChild(nameContainer);
+            const nameElement = document.createElement('span');
             nameElement.className = 'opponent-name';
             nameElement.textContent = opponent.getName();
-            opponentElement.appendChild(nameElement);
-
+            if (opponent === this.game?.getCurrentPlayer()) {
+                nameElement.classList.add('current-player');
+            } else {
+                nameElement.classList.remove('current-player');
+            }
+            nameContainer.appendChild(nameElement);
+            const skippedTurnsElement = document.createElement('span');
+            skippedTurnsElement.className = 'opponent-skipped-turns';
+            skippedTurnsElement.textContent = opponent.getSkippedTurns().toString();
+            if (opponent.getSkippedTurns() > 0) {
+                skippedTurnsElement.classList.add('has-skipped-turns');
+            } else {
+                skippedTurnsElement.classList.remove('has-skipped-turns');
+            }
+            nameContainer.appendChild(skippedTurnsElement);
             const cardsElement = document.createElement('div');
             cardsElement.className = 'opponent-cards';
 
@@ -236,6 +253,14 @@ class UnoGameUI {
             opponentElement.appendChild(cardsElement);
             opponentsContainer.appendChild(opponentElement);
         });
+    }
+
+    private updatePlayerSkippedTurns(): void {
+        const playerSkippedTurnsElement = document.getElementById('player-skipped-turns');
+        if (playerSkippedTurnsElement) {
+            playerSkippedTurnsElement.textContent = `Skipped Turns: ${this.humanPlayer.getSkippedTurns()}`;
+        }
+
     }
 
     // Render the player's hand
@@ -516,5 +541,4 @@ class UnoGameUI {
 document.addEventListener('DOMContentLoaded', () => {
     new UnoGameUI();
 });
-
 

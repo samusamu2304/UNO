@@ -23,10 +23,10 @@ export enum Direction {
 }
 
 export class Game implements GameState{
-    players: Player[] = [];
-    currentPlayerIndex: number = 0;
-    direction: Direction = Direction.CLOCKWISE;
-    deck: Deck;
+    private players: Player[] = [];
+    private currentPlayerIndex: number = 0;
+    private direction: Direction = Direction.CLOCKWISE;
+    private deck: Deck;
     private topCard: Card | null = null;
     private deckFactory: DeckFactory;
     private eventListeners: GameEventListener[] = [];
@@ -41,6 +41,15 @@ export class Game implements GameState{
         this.players = players;
         this.deckFactory = deckFactory;
         this.deck = this.deckFactory.createDeck();
+    }
+
+    getDirection(): Direction.CLOCKWISE | Direction.COUNTER_CLOCKWISE {
+        return this.direction;
+    }
+
+    setDirection(direction: Direction.CLOCKWISE | Direction.COUNTER_CLOCKWISE): void {
+        this.direction = direction;
+        this.emitEvent(GameEvent.DIRECTION_CHANGE, { direction });
     }
 
     // Event handling
@@ -231,8 +240,8 @@ export class Game implements GameState{
     }
 
     // GameState interface implementation
-    skipNextPlayer(): void {
-        this.skipFlag = true;
+    skipNextPlayer(n : number): void {
+        this.getNextPlayer().addSkippedTurns(n);
         this.emitEvent(GameEvent.PLAYER_SKIPPED, {
             player: this.getNextPlayer()
         });
@@ -275,13 +284,12 @@ export class Game implements GameState{
 
     // Move to the next player's turn
     private nextTurn(): void {
-        // Calcular el siguiente índice de jugador
+        // Calcular el siguiente índice de jugador de manera circular
         let nextIndex = (this.currentPlayerIndex + this.direction + this.players.length) % this.players.length;
 
-        // Si el flag de skip está activo, saltar un jugador
-        if (this.skipFlag) {
+        while (this.players[nextIndex].consumeSkippedTurn()) {
+            this.emitEvent(GameEvent.PLAYER_SKIPPED, { player: this.players[nextIndex] });
             nextIndex = (nextIndex + this.direction + this.players.length) % this.players.length;
-            this.skipFlag = false;
         }
 
         this.currentPlayerIndex = nextIndex;
@@ -374,4 +382,5 @@ export class Game implements GameState{
         }
     }
 }
+
 

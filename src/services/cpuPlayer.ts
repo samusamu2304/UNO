@@ -5,7 +5,9 @@ import { PlayerStrategy } from './playerStrategy';
 import { CardColor} from "../types/types";
 
 export class CpuStrategy implements PlayerStrategy {
-    makeMove(game: GameState, player: Player): void {
+    async makeMove(game: GameState, player: Player): Promise<void> {
+        // simula delay para que parezca más humano
+        await new Promise(resolve => setTimeout(resolve, 500));
         const topCard = game.getTopCard();
         if (!topCard) return;
         const playableCard = player.findPlayableCard(topCard);
@@ -33,3 +35,4 @@ export class CpuPlayer extends Player {
         super(name, new CpuStrategy());
     }
 }
+

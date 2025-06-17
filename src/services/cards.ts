@@ -111,7 +111,7 @@ export class SkipCard extends Card {
     }
 
     playEffect(game: GameState): void {
-        game.skipNextPlayer();
+        game.skipNextPlayer(1);
     }
 }
 
@@ -145,7 +145,7 @@ export class DrawTwoCard extends Card {
     playEffect(game: any): void {
         // Aplica el efecto automáticamente
         game.nextPlayerDraws(2);
-        game.skipNextPlayer();
+        game.skipNextPlayer(1);
     }
 }
 
@@ -224,7 +224,24 @@ export class WildDrawFourCard extends WildCard {
 
     completeEffect(game: GameState): void {
         game.nextPlayerDraws(4);
-        game.skipNextPlayer();
+        game.skipNextPlayer(1);
     }
 }
+
+export class SkipTwoCard extends Card {
+    constructor(color: CardColor) {
+        super(color, 'SKIP TWO', CardType.SKIP_TWO);
+    }
+
+    canPlayOn(topCard: Card): boolean {
+        return this.color === topCard.getColor() ||
+               topCard.getType() === CardType.SKIP_TWO ||
+               topCard.getColor() === CardColor.WILD;
+    }
+
+    playEffect(game: GameState): void {
+        game.skipNextPlayer(2);
+    }
+}
+
 
