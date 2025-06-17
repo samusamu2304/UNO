@@ -46,6 +46,7 @@ class UnoGameUI {
     // Initialize the game
     private initGame(gameType: 'standard' | 'quick' | 'wild'): void {
         // Crear oponentes CPU usando la nueva clase
+        this.humanPlayer = new Player('You');
         this.opponents = [
             new CpuPlayer('Computer 1'),
             new CpuPlayer('Computer 2'),
