@@ -1,10 +1,11 @@
 import { Player } from './player';
-import { Card, CardColor, WildCard } from './cards';
-import { Game } from './game';
+import { Card, WildCard } from './cards';
+import { GameState} from "../types/types";
 import { PlayerStrategy } from './playerStrategy';
+import { CardColor} from "../types/types";
 
 export class CpuStrategy implements PlayerStrategy {
-    makeMove(game: Game, player: Player): void {
+    makeMove(game: GameState, player: Player): void {
         const topCard = game.getTopCard();
         if (!topCard) return;
         const playableCard = player.findPlayableCard(topCard);

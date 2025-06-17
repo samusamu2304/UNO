@@ -14,6 +14,7 @@
                 <select id="game-type">
                     <option value="standard">Standard UNO</option>
                     <option value="quick">Quick UNO</option>
+                    <option value="wild">Mostly wild</option>
                 </select>
             </div>
         </div>
@@ -55,6 +56,19 @@
             <h3>Game Log</h3>
             <div id="log-container" class="log-container">
                 <!-- Game events will be logged here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para selección de color (oculto por defecto) -->
+    <div id="color-selection-modal" class="color-selection-modal" style="display: none;">
+        <div class="modal-content">
+            <h2>Select a color</h2>
+            <div class="color-options">
+                <button id="color-red" class="color-button" style="background-color: #e74c3c;"></button>
+                <button id="color-blue" class="color-button" style="background-color: #3498db;"></button>
+                <button id="color-green" class="color-button" style="background-color: #2ecc71;"></button>
+                <button id="color-yellow" class="color-button" style="background-color: #f1c40f;"></button>
             </div>
         </div>
     </div>

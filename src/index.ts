@@ -1,7 +1,8 @@
 import { Game, GameEvent } from './services/game';
 import { Player } from './services/player';
-import { StandardUNODeckFactory, SmallUNODeckFactory } from './services/deck';
-import { Card, CardColor, CardType, WildCard } from './services/cards';
+import {StandardUNODeckFactory, SmallUNODeckFactory, mostlyWildDeckFactory} from './services/deck';
+import { Card, WildCard } from './services/cards';
+import { CardColor} from "./types/types";
 import { CpuPlayer } from './services/cpuPlayer';
 import './styles.css';
 import { Logger } from './services/logging';
@@ -19,6 +20,7 @@ class UnoGameUI {
     constructor() {
         this.humanPlayer = new Player('You');
         this.setupEventListeners();
+
         // Escuchar eventos de log y actualizar el DOM
         window.addEventListener('log-message', (e: any) => {
             const logContainer = document.getElementById('log-container');
@@ -30,10 +32,19 @@ class UnoGameUI {
                 logContainer.scrollTop = logContainer.scrollHeight;
             }
         });
+
+        // Escuchar el evento emitido por las cartas Wild cuando se juegan
+        window.addEventListener('wild-card-played', (e: any) => { // e debería ser ColorSelectionEvent
+            // Solo mostrar modal si el evento es para un jugador humano
+            if (e.detail.isHumanPlayer && e.detail.card) {
+                this.selectedCard = e.detail.card;
+                this.showColorSelection();
+            }
+        });
     }
 
     // Initialize the game
-    private initGame(gameType: 'standard' | 'quick'): void {
+    private initGame(gameType: 'standard' | 'quick' | 'wild'): void {
         // Crear oponentes CPU usando la nueva clase
         this.opponents = [
             new CpuPlayer('Computer 1'),
@@ -47,10 +58,15 @@ class UnoGameUI {
                 [this.humanPlayer, ...this.opponents],
                 new StandardUNODeckFactory()
             );
-        } else {
+        } else if (gameType === 'quick') {
             this.game = new Game(
                 [this.humanPlayer, ...this.opponents],
                 new SmallUNODeckFactory()
+            );
+        } else {
+            this.game = new Game(
+                [this.humanPlayer, ...this.opponents],
+                new mostlyWildDeckFactory(),
             );
         }
 
@@ -88,7 +104,7 @@ class UnoGameUI {
     }
 
     // Start a new game
-    private startNewGame(gameType: 'standard' | 'quick'): void {
+    private startNewGame(gameType: 'standard' | 'quick' | 'wild'): void {
         // Clear the UI
         this.clearUI();
 
@@ -127,15 +143,7 @@ class UnoGameUI {
             case GameEvent.TURN_START:
                 this.updateGameInfo();
                 this.enablePlayerActions(data.player === this.humanPlayer);
-                // Si es CPU, forzar jugada desde la UI (workaround)
-                if (data.player !== this.humanPlayer && typeof data.player.makeMove === 'function') {
-                    setTimeout(() => {
-                        // Verifica que sigue siendo el turno del mismo jugador
-                        if (this.game && this.game.getCurrentPlayer() === data.player) {
-                            data.player.makeMove(this.game);
-                        }
-                    }, 700);
-                }
+                // La lógica de la CPU ahora es manejada internamente por Game.ts en startTurn
                 break;
 
             case GameEvent.CARD_PLAYED:
@@ -297,85 +305,47 @@ class UnoGameUI {
             return;
         }
 
-        // If it's a wild card, show color selection
-        if (card instanceof WildCard) {
-            this.selectedCard = card;
-            this.showColorSelection();
-        } else {
-            // Play the card
-            this.playCard(card);
-        }
+        // Play the card (ahora la carta maneja sus propios eventos)
+        this.playCard(card);
     }
 
     // Show color selection for wild cards
     private showColorSelection(): void {
-        // Create a modal for color selection
-        const modal = document.createElement('div');
-        modal.className = 'color-selection-modal';
-        modal.style.position = 'fixed';
-        modal.style.top = '0';
-        modal.style.left = '0';
-        modal.style.width = '100%';
-        modal.style.height = '100%';
-        modal.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        const modal = document.getElementById('color-selection-modal');
+        if (!modal) return;
+
         modal.style.display = 'flex';
-        modal.style.justifyContent = 'center';
-        modal.style.alignItems = 'center';
-        modal.style.zIndex = '1000';
 
-        // Create the color selection container
-        const container = document.createElement('div');
-        container.style.backgroundColor = 'white';
-        container.style.padding = '20px';
-        container.style.borderRadius = '10px';
-        container.style.textAlign = 'center';
+        const setupColorButton = (id: string, color: CardColor) => {
+            const button = document.getElementById(id);
+            if (button) {
+                const newButton = button.cloneNode(true);
+                button.parentNode?.replaceChild(newButton, button);
 
-        // Add title
-        const title = document.createElement('h2');
-        title.textContent = 'Select a color';
-        container.appendChild(title);
+                newButton.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                    if (this.selectedCard && this.selectedCard instanceof WildCard) {
+                        this.selectedCard.setColor(color);
 
-        // Add color options
-        const colors = [
-            { name: 'Red', value: CardColor.RED, bgColor: '#e74c3c' },
-            { name: 'Blue', value: CardColor.BLUE, bgColor: '#3498db' },
-            { name: 'Green', value: CardColor.GREEN, bgColor: '#2ecc71' },
-            { name: 'Yellow', value: CardColor.YELLOW, bgColor: '#f1c40f' }
-        ];
+                        // Actualizar visualmente la carta en el montón de descarte
+                        if (this.game && this.game.getTopCard() === this.selectedCard) {
+                            this.renderTopCard(this.selectedCard);
+                        }
+                        Logger.getInstance().log(`${this.humanPlayer.getName()} chose ${color} for the Wild card.`);
 
-        const colorContainer = document.createElement('div');
-        colorContainer.style.display = 'flex';
-        colorContainer.style.justifyContent = 'center';
-        colorContainer.style.gap = '10px';
-        colorContainer.style.marginTop = '20px';
+                        if (this.game) {
+                            this.game.completeWildCardPlay(this.selectedCard);
+                        }
+                        this.selectedCard = null;
+                    }
+                });
+            }
+        };
 
-        colors.forEach(color => {
-            const colorButton = document.createElement('button');
-            colorButton.style.width = '50px';
-            colorButton.style.height = '50px';
-            colorButton.style.backgroundColor = color.bgColor;
-            colorButton.style.border = 'none';
-            colorButton.style.borderRadius = '5px';
-            colorButton.style.cursor = 'pointer';
-
-            colorButton.addEventListener('click', () => {
-                this.selectedColor = color.value;
-                document.body.removeChild(modal);
-
-                if (this.selectedCard && this.selectedCard instanceof WildCard) {
-                    this.selectedCard.setColor(this.selectedColor);
-                    this.playCard(this.selectedCard);
-                    this.selectedCard = null;
-                    this.selectedColor = null;
-                }
-            });
-
-            colorContainer.appendChild(colorButton);
-        });
-
-        container.appendChild(colorContainer);
-        modal.appendChild(container);
-        document.body.appendChild(modal);
+        setupColorButton('color-red', CardColor.RED);
+        setupColorButton('color-blue', CardColor.BLUE);
+        setupColorButton('color-green', CardColor.GREEN);
+        setupColorButton('color-yellow', CardColor.YELLOW);
     }
 
     // Play a card
@@ -546,3 +516,5 @@ class UnoGameUI {
 document.addEventListener('DOMContentLoaded', () => {
     new UnoGameUI();
 });
+
+

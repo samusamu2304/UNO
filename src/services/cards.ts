@@ -1,26 +1,19 @@
-import { Game } from './game';
+import { Player } from './player';
+import { CpuPlayer } from './cpuPlayer';
 import reverseImage from '../assets/cardIcons/arrow_reverse_icon.svg';
+import { GameState, CardColor, CardType } from '../types/types';
 
-export enum CardColor {
-    RED = 'red',
-    BLUE = 'blue',
-    GREEN = 'green',
-    YELLOW = 'yellow',
-    WILD = 'wild'
+// Evento personalizado para la selección de color
+export interface ColorSelectionEvent extends CustomEvent {
+    detail: {
+        card: WildCard;
+        isHumanPlayer: boolean; // Añadimos un flag para distinguir si es jugador humano
+    };
 }
 
-export enum CardType {
-    NUMBER = 'number',
-    SKIP = 'skip',
-    REVERSE = 'reverse',
-    DRAW_TWO = 'draw_two',
-    WILD = 'wild',
-    WILD_DRAW_FOUR = 'wild_draw_four'
-}
 
-export interface CardEffect {
-    apply(game: Game): void;
-}
+
+// Resto de cartas igual, usando GameState
 
 export abstract class Card {
     protected constructor(
@@ -53,28 +46,35 @@ export abstract class Card {
         const cardElement = document.createElement('div');
         cardElement.className = 'card';
 
-        // Añadir clase de color
+        // Aplicar clase de color basada en getColor(). Para WildCard, esto usará newColor si está seteado, o CardColor.WILD.
         cardElement.classList.add(`card-${this.getColor()}`);
 
-
-        // Imagen si existe
+        // Imagen si existe, o valor como texto
         if (this.hasImage()) {
             const iconElement = document.createElement('img');
             iconElement.src = this.getImageURL();
             iconElement.className = 'card-icon';
             cardElement.appendChild(iconElement);
         } else {
-            // Si no hay imagen, mostrar el valor como texto
-            const textElement = document.createElement('span');
-            textElement.textContent = this.getValue();
-            cardElement.appendChild(textElement);
+            const value = this.getValue();
+            if (value) {
+                const textElement = document.createElement('span');
+                textElement.className = 'card-value';
+                textElement.textContent = value;
+                cardElement.appendChild(textElement);
+            }
         }
-
         return cardElement;
     }
 
+    // Método para emitir eventos
+    protected emitEvent(eventName: string, detail: any): void {
+        const event = new CustomEvent(eventName, { detail });
+        window.dispatchEvent(event);
+    }
+
     abstract canPlayOn(topCard: Card): boolean;
-    abstract playEffect(game: Game): void;
+    abstract playEffect(game: GameState): void;
 
     toString(): string {
         return `${this.color} ${this.value}`;
@@ -93,7 +93,7 @@ export class NumberCard extends Card {
                topCard.getColor() === CardColor.WILD;
     }
 
-    playEffect(game: Game): void {
+    playEffect(game: GameState): void {
         // Number cards have no special effect
     }
 
@@ -110,7 +110,7 @@ export class SkipCard extends Card {
                topCard.getColor() === CardColor.WILD;
     }
 
-    playEffect(game: Game): void {
+    playEffect(game: GameState): void {
         game.skipNextPlayer();
     }
 }
@@ -126,7 +126,7 @@ export class ReverseCard extends Card {
                topCard.getColor() === CardColor.WILD;
     }
 
-    playEffect(game: Game): void {
+    playEffect(game: GameState): void {
         game.reverseDirection();
     }
 }
@@ -157,34 +157,40 @@ export class WildCard extends Card {
     }
 
     canPlayOn(topCard: Card): boolean {
-        // Wild cards can be played on any card
         return true;
     }
 
     setColor(color: CardColor): void {
-            this.newColor = color;
+        this.newColor = color;
+    }
+
+    // Método para resetear el color elegido cuando la carta vuelve al mazo/descarte
+    resetColor(): void {
+        this.newColor = null;
     }
 
     getColor(): CardColor {
-        return this.newColor || CardColor.WILD;
+        // Devuelve el color elegido si existe, sino el color base de la WildCard.
+        return this.newColor || super.getColor(); // super.getColor() devolverá CardColor.WILD
     }
 
-    playEffect(game: Game): void {
-        // Para wild cards, pedir color al jugador actual
+    playEffect(game: GameState): void {
         const currentPlayer = game.getCurrentPlayer();
-        const chosenColor = currentPlayer.chooseColor();
-        this.setColor(chosenColor);
+        const isHumanPlayer = !(currentPlayer instanceof CpuPlayer);
+
+        if (isHumanPlayer) {
+            this.emitEvent('wild-card-played', {
+                card: this,
+                isHumanPlayer: true
+            });
+        } else {
+            const chosenColor = currentPlayer.chooseColor();
+            this.setColor(chosenColor);
+        }
     }
 
-    toCardElement(): HTMLElement {
-        const cardElement = super.toCardElement();
-        if (!this.newColor) {
-            cardElement.classList.add('grid-bg');
-        } else {
-            cardElement.classList.remove('grid-bg');
-        }
-        return cardElement;
-    }
+    // toCardElement se hereda de Card y ahora funcionará correctamente
+    // para mostrar el color elegido o el fondo de card-wild.
 }
 
 export class WildDrawFourCard extends WildCard {
@@ -200,9 +206,23 @@ export class WildDrawFourCard extends WildCard {
         return '+4';
     }
 
-    playEffect(game: Game): void {
-        // Pedir color y aplicar efecto automáticamente
-        super.playEffect(game);
+    playEffect(game: GameState): void {
+        const currentPlayer = game.getCurrentPlayer();
+        const isHumanPlayer = !(currentPlayer instanceof CpuPlayer);
+
+        if (isHumanPlayer) {
+            this.emitEvent('wild-card-played', {
+                card: this,
+                isHumanPlayer: true
+            });
+        } else {
+            const chosenColor = currentPlayer.chooseColor();
+            this.setColor(chosenColor);
+            this.completeEffect(game);
+        }
+    }
+
+    completeEffect(game: GameState): void {
         game.nextPlayerDraws(4);
         game.skipNextPlayer();
     }

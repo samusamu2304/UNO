@@ -1,7 +1,7 @@
-import { Game } from './game';
 import { Player } from './player';
+import {GameState} from "../types/types";
 
 export interface PlayerStrategy {
-    makeMove(game: Game, player: Player): void;
+    makeMove(game: GameState, player: Player): void;
 }
 

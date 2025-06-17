@@ -1,5 +1,6 @@
-import { Card, CardColor } from './cards';
+import { Card, } from './cards';
 import { PlayerStrategy } from './playerStrategy';
+import {CardColor, GameState} from "../types/types";
 
 export class Player {
     private hand: Card[] = [];
@@ -139,7 +140,7 @@ export class Player {
         this.strategy = strategy;
     }
 
-    makeMove(game: any) {
+    makeMove(game: GameState) {
         if (this.strategy) {
             this.strategy.makeMove(game, this);
         }

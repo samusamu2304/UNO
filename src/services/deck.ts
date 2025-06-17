@@ -1,4 +1,5 @@
-import { Card, CardColor, CardType, NumberCard, SkipCard, ReverseCard, DrawTwoCard, WildCard, WildDrawFourCard } from './cards';
+import { CardColor } from '../types/types';
+import { Card, NumberCard, SkipCard, ReverseCard, DrawTwoCard, WildCard, WildDrawFourCard } from './cards';
 
 export interface DeckFactory {
     createDeck(): Deck;
@@ -46,6 +47,10 @@ export class Deck {
 
     discard(card: Card): void {
         if (this.topCard) {
+            // Si la carta que estaba en el tope era una WildCard, resetea su color elegido.
+            if (this.topCard instanceof WildCard) {
+                (this.topCard as WildCard).resetColor();
+            }
             this.discardPile.push(this.topCard);
         }
         this.topCard = card;
@@ -146,6 +151,31 @@ export class SmallUNODeckFactory implements DeckFactory {
             cards.push(new WildDrawFourCard());
         }
         
+        const deck = new Deck(cards);
+        deck.shuffle();
+        return deck;
+    }
+}
+
+export class mostlyWildDeckFactory implements DeckFactory {
+    createDeck(): Deck {
+        const cards: Card[] = [];
+
+        // Add mostly Wild cards
+        for (let i = 0; i < 20; i++) {
+            cards.push(new WildCard());
+            cards.push(new WildDrawFourCard());
+        }
+
+        // Add a few number cards
+        const colors = [CardColor.RED, CardColor.BLUE, CardColor.GREEN, CardColor.YELLOW];
+        for (const color of colors) {
+            for (let i = 0; i < 2; i++) {
+                cards.push(new NumberCard(color, '0'));
+                cards.push(new NumberCard(color, '1'));
+            }
+        }
+
         const deck = new Deck(cards);
         deck.shuffle();
         return deck;

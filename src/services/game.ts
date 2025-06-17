@@ -1,6 +1,8 @@
-import { Card, CardColor, WildCard } from './cards';
+import {Card, WildCard, WildDrawFourCard} from './cards';
 import { Deck, DeckFactory, StandardUNODeckFactory } from './deck';
 import { Player } from './player';
+import { CpuPlayer } from './cpuPlayer'; // Añadido para instanceof
+import { GameState, CardType, CardColor} from "../types/types";
 
 export enum GameEvent {
     GAME_START = 'game_start',
@@ -20,18 +22,7 @@ export enum Direction {
     COUNTER_CLOCKWISE = -1
 }
 
-export interface GameState {
-    players: Player[];
-    currentPlayerIndex: number;
-    direction: Direction;
-    deck: Deck;
-    skipNextPlayer(): void;
-    reverseDirection(): void;
-    nextPlayerDraws(count: number): void;
-    getCurrentPlayer(): Player;
-    getNextPlayer(): Player;
-}
-export class Game implements GameState {
+export class Game implements GameState{
     players: Player[] = [];
     currentPlayerIndex: number = 0;
     direction: Direction = Direction.CLOCKWISE;
@@ -117,16 +108,14 @@ export class Game implements GameState {
         if (this.gameOver) {
             return;
         }
-
         const currentPlayer = this.getCurrentPlayer();
-
         this.emitEvent(GameEvent.TURN_START, {
             player: currentPlayer,
             topCard: this.topCard
         });
 
-        // Delegar la jugada al strategy del jugador (patrón Strategy)
-        if (typeof currentPlayer.makeMove === 'function' && currentPlayer["strategy"]) {
+        // Si es CPU y el juego no ha terminado, que haga su movimiento.
+        if (currentPlayer instanceof CpuPlayer && !this.gameOver) {
             setTimeout(() => {
                 if (this.getCurrentPlayer() === currentPlayer && !this.gameOver) {
                     currentPlayer.makeMove(this);
@@ -140,70 +129,98 @@ export class Game implements GameState {
         if (this.gameOver) {
             return false;
         }
-
         const currentPlayer = this.getCurrentPlayer();
-
-        // Check if the card can be played
         if (!this.topCard || !card.canPlayOn(this.topCard)) {
             return false;
         }
-
-        // Remove the card from the player's hand
         const playedCard = currentPlayer.playCard(card);
         if (!playedCard) {
-            return false; // Player doesn't have the card
+            return false;
         }
 
-        // Aplicar el efecto de la carta directamente
-        playedCard.playEffect(this);
+        playedCard.playEffect(this); // La carta maneja su efecto (emite evento si es Wild humana, o setea color y aplica efecto si es CPU)
 
-        // Update the top card
         this.deck.discard(playedCard);
         this.topCard = playedCard;
 
-        // Emit card played event
         this.emitEvent(GameEvent.CARD_PLAYED, {
             player: currentPlayer,
             card: playedCard
         });
 
-        // Check if the player has won
-        if (this.checkWinCondition()) {
+        // Si es una WildCard y su color aún es CardColor.WILD (esperando selección de modal humano),
+        // no avanzar el turno. El turno se completará vía completeWildCardPlay.
+        if (playedCard instanceof WildCard && playedCard.getColor() === CardColor.WILD) {
             return true;
         }
 
-        // Check if the player has UNO
+        // Para cartas no-Wild, o Wilds de CPU (que ya eligieron color y aplicaron efectos), completar el turno.
+        if (this.checkWinCondition()) {
+            return true;
+        }
         if (currentPlayer.hasUno()) {
             this.emitEvent(GameEvent.UNO_CALLED, {
                 player: currentPlayer
             });
         }
-
-        // Move to the next player's turn
         this.nextTurn();
-
         return true;
     }
 
+    // Método para completar la jugada de una carta comodín después de seleccionar un color
+    completeWildCardPlay(card: Card): void {
+        // Solo actuar si el juego no ha terminado, es una WildCard, y el color ya fue establecido.
+        if (this.gameOver || !(card instanceof WildCard) || card.getColor() === CardColor.WILD) {
+            return;
+        }
+
+        const currentPlayer = this.getCurrentPlayer();
+
+        // Si es WildDrawFourCard, y fue jugada por un humano (CPU ya aplicó este efecto en playEffect)
+        // Necesitamos asegurar que completeEffect no se llame dos veces para CPU.
+        // La lógica actual en WildDrawFourCard.playEffect ya llama a completeEffect para CPU.
+        // Para humanos, completeEffect se llama aquí.
+        if (card.getType() === CardType.WILD_DRAW_FOUR && card instanceof WildDrawFourCard && !(currentPlayer instanceof CpuPlayer)) {
+            card.completeEffect(this);
+        }
+
+        if (this.checkWinCondition()) {
+            return;
+        }
+        if (currentPlayer.hasUno()) {
+            this.emitEvent(GameEvent.UNO_CALLED, {
+                player: currentPlayer
+            });
+        }
+        this.nextTurn();
+    }
+
+    /**
+     * Roba una carta de la baraja y la añade a la mano del jugador actual.
+     * Implementa el patrón Facade para simplificar la interacción con el subsistema Deck.
+     * @returns La carta robada, o null si no hay más cartas.
+     */
     drawCard(): Card | null {
         if (this.gameOver) {
             return null;
         }
 
         const currentPlayer = this.getCurrentPlayer();
+        // Delega la operación de robar carta al subsistema Deck
         const card = this.deck.draw();
 
         if (card) {
+            // Añade la carta a la mano del jugador
             currentPlayer.addCard(card);
 
+            // Notifica a los observadores sobre la carta robada
             this.emitEvent(GameEvent.CARD_DRAWN, {
                 player: currentPlayer,
                 card: card
             });
 
-            // If the drawn card can be played, the player can choose to play it
-            // Otherwise, the turn passes to the next player
-            if (!card.canPlayOn(this.topCard!)) {
+            // Si la carta robada no se puede jugar, pasa el turno
+            if (this.topCard && !card.canPlayOn(this.topCard)) {
                 this.nextTurn();
             }
 
@@ -357,3 +374,4 @@ export class Game implements GameState {
         }
     }
 }
+
