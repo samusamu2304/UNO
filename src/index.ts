@@ -2,7 +2,7 @@ import { Game, GameEvent } from './services/game';
 import { Player } from './services/player';
 import {StandardUNODeckFactory, SmallUNODeckFactory, mostlyWildDeckFactory} from './services/deck';
 import { Card, WildCard } from './services/cards';
-import { CardColor} from "./types/types";
+import {CardColor, GameView} from "./types/types";
 import { CpuPlayer } from './services/cpuPlayer';
 import './styles.css';
 import { Logger } from './services/logging';
@@ -10,7 +10,7 @@ import { Logger } from './services/logging';
 
 
 // UI Controller class to handle the interaction between the UI and the game logic
-class UnoGameUI {
+class UnoGameUI implements GameView{
     private game: Game | null = null;
     private humanPlayer: Player;
     private opponents: Player[] = [];
@@ -57,22 +57,25 @@ class UnoGameUI {
         if (gameType === 'standard') {
             this.game = new Game(
                 [this.humanPlayer, ...this.opponents],
-                new StandardUNODeckFactory()
+                new StandardUNODeckFactory(),
+                this
             );
         } else if (gameType === 'quick') {
             this.game = new Game(
                 [this.humanPlayer, ...this.opponents],
-                new SmallUNODeckFactory()
+                new SmallUNODeckFactory(),
+                this
             );
         } else {
             this.game = new Game(
                 [this.humanPlayer, ...this.opponents],
                 new mostlyWildDeckFactory(),
+                this
             );
         }
 
         // Add event listeners to the game
-        this.game.addEventListener(this.handleGameEvent.bind(this));
+        this.game.addEventListener(this.onGameEvent.bind(this));
     }
 
     // Set up event listeners for UI elements
@@ -128,7 +131,7 @@ class UnoGameUI {
     }
 
     // Handle game events
-    private handleGameEvent(event: GameEvent, data: any): void {
+    onGameEvent(event: GameEvent, data: any): void {
         // Log the event
         this.logEvent(event, data);
 

@@ -2,7 +2,7 @@ import {Card, WildCard, WildDrawFourCard} from './cards';
 import { Deck, DeckFactory, StandardUNODeckFactory } from './deck';
 import { Player } from './player';
 import { CpuPlayer } from './cpuPlayer'; // Añadido para instanceof
-import { GameState, CardType, CardColor} from "../types/types";
+import { GameState, CardType, CardColor, GameView} from "../types/types";
 
 export enum GameEvent {
     GAME_START = 'game_start',
@@ -33,14 +33,17 @@ export class Game implements GameState{
     private skipFlag: boolean = false;
     private winner: Player | null = null;
     private gameOver: boolean = false;
+    private view?: GameView;
 
     constructor(
         players: Player[] = [],
-        deckFactory: DeckFactory = new StandardUNODeckFactory()
+        deckFactory: DeckFactory = new StandardUNODeckFactory(),
+        view: GameView
     ) {
         this.players = players;
         this.deckFactory = deckFactory;
         this.deck = this.deckFactory.createDeck();
+        this.view = view;
     }
 
     getDirection(): Direction.CLOCKWISE | Direction.COUNTER_CLOCKWISE {
@@ -67,6 +70,9 @@ export class Game implements GameState{
     private emitEvent(event: GameEvent, data: any = {}): void {
         for (const listener of this.eventListeners) {
             listener(event, data);
+        }
+        if (this.view) {
+            this.view.onGameEvent(event, data);
         }
     }
 
