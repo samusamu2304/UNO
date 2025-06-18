@@ -2,6 +2,7 @@ import { Player } from './player';
 import { CpuPlayer } from './cpuPlayer';
 import reverseImage from '../assets/cardIcons/arrow_reverse_icon.svg';
 import { GameState, CardColor, CardType } from '../types/types';
+import {Logger} from "./logging";
 
 // Evento personalizado para la selección de color
 export interface ColorSelectionEvent extends CustomEvent {
@@ -65,6 +66,40 @@ export abstract class Card {
             }
         }
         return cardElement;
+    }
+
+    toJSON(): object {
+        return {
+            color: this.color,
+            value: this.value,
+            type: this.type,
+            imageURL: this.imageURL
+        }
+    }
+
+    static fromJSON(obj: any): Card {
+        switch (obj.type) {
+            case 'number':
+                return new NumberCard(obj.color, obj.value);
+            case 'skip':
+                return new SkipCard(obj.color);
+            case 'reverse':
+                return new ReverseCard(obj.color);
+            case 'draw_two':
+                return new DrawTwoCard(obj.color);
+            case 'wild':
+                const wild = new WildCard();
+                if (obj.color && obj.color !== 'wild') wild.setColor(obj.color);
+                return wild;
+            case 'wild_draw_four':
+                const wild4 = new WildDrawFourCard();
+                if (obj.color && obj.color !== 'wild') wild4.setColor(obj.color);
+                return wild4;
+            case 'skip_two':
+                return new SkipTwoCard(obj.color);
+            default:
+                throw new Error('Tipo de carta desconocido: ' + obj.type);
+        }
     }
 
     // Método para emitir eventos

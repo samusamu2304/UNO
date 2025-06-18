@@ -1,17 +1,17 @@
-import { Game, GameEvent } from './services/game';
-import { Player } from './services/player';
-import {StandardUNODeckFactory, SmallUNODeckFactory, mostlyWildDeckFactory} from './services/deck';
-import { Card, WildCard } from './services/cards';
-import {CardColor, GameView} from "./types/types";
-import { CpuPlayer } from './services/cpuPlayer';
+import {Game, GameEvent} from './services/game';
+import {Player} from './services/player';
+import {mostlyWildDeckFactory, SmallUNODeckFactory, StandardUNODeckFactory} from './services/deck';
+import {Card, WildCard} from './services/cards';
+import {CardColor, DeckType, GameRequestType, GameView} from "./types/types";
+import {CpuPlayer} from './services/cpuPlayer';
 import './styles.css';
-import { Logger } from './services/logging';
-
+import {Logger} from './services/logging';
+import {GameAPI} from "./services/GameAPI";
 
 
 // UI Controller class to handle the interaction between the UI and the game logic
-class UnoGameUI implements GameView{
-    private game: Game | null = null;
+class UnoGameUI implements GameView {
+    private game: GameAPI | null = null;
     private humanPlayer: Player;
     private opponents: Player[] = [];
     private selectedCard: Card | null = null;
@@ -43,8 +43,12 @@ class UnoGameUI implements GameView{
         });
     }
 
+    setGame(game: GameAPI): void {
+        this.game = game;
+    }
+
     // Initialize the game
-    private initGame(gameType: 'standard' | 'quick' | 'wild'): void {
+    private initGame(type : DeckType): void {
         // Crear oponentes CPU usando la nueva clase
         this.humanPlayer = new Player('You');
         this.opponents = [
@@ -54,28 +58,14 @@ class UnoGameUI implements GameView{
         ];
 
         // Crear el juego solo con los jugadores y la baraja
-        if (gameType === 'standard') {
-            this.game = new Game(
-                [this.humanPlayer, ...this.opponents],
-                new StandardUNODeckFactory(),
-                this
-            );
-        } else if (gameType === 'quick') {
-            this.game = new Game(
-                [this.humanPlayer, ...this.opponents],
-                new SmallUNODeckFactory(),
-                this
-            );
-        } else {
-            this.game = new Game(
-                [this.humanPlayer, ...this.opponents],
-                new mostlyWildDeckFactory(),
-                this
-            );
+        this.game?.sendGameRequest({
+            action: GameRequestType.SET_DECK,
+            payload: {
+                deck: type
+            }
+        })
         }
 
-        // Add event listeners to the game
-        this.game.addEventListener(this.onGameEvent.bind(this));
     }
 
     // Set up event listeners for UI elements
@@ -85,7 +75,7 @@ class UnoGameUI implements GameView{
         if (startGameButton) {
             startGameButton.addEventListener('click', () => {
                 const gameTypeSelect = document.getElementById('game-type') as HTMLSelectElement;
-                const gameType = gameTypeSelect.value as 'standard' | 'quick';
+                const gameType = gameTypeSelect.value as DeckType;
                 this.startNewGame(gameType);
             });
         }
@@ -108,7 +98,7 @@ class UnoGameUI implements GameView{
     }
 
     // Start a new game
-    private startNewGame(gameType: 'standard' | 'quick' | 'wild'): void {
+    private startNewGame(type : DeckType): void {
         // Clear the UI
         this.clearUI();
 
@@ -116,11 +106,11 @@ class UnoGameUI implements GameView{
         this.humanPlayer.clearHand();
 
         // Initialize the game
-        this.initGame(gameType);
+        this.initGame(type);
 
         // Start the game
         if (this.game) {
-            this.game.start();
+            this.game.sendGameRequest(GameRequestType.START_GAME);
         }
 
         // Enable the draw card button
@@ -312,7 +302,28 @@ class UnoGameUI implements GameView{
 
     // Create a card element
     private createCardElement(card: Card): HTMLElement {
-        return card.toCardElement()
+        const cardElement = document.createElement('div');
+        cardElement.className = 'card';
+
+        // Aplicar clase de color basada en getColor(). Para WildCard, esto usará newColor si está seteado, o CardColor.WILD.
+        cardElement.classList.add(`card-${card.getColor()}`);
+
+        // Imagen si existe, o valor como texto
+        if (card.hasImage()) {
+            const iconElement = document.createElement('img');
+            iconElement.src = card.getImageURL();
+            iconElement.className = 'card-icon';
+            cardElement.appendChild(iconElement);
+        } else {
+            const value = card.getValue();
+            if (value) {
+                const textElement = document.createElement('span');
+                textElement.className = 'card-value';
+                textElement.textContent = value;
+                cardElement.appendChild(textElement);
+            }
+        }
+        return cardElement;
     }
 
     // Handle card click
@@ -324,13 +335,13 @@ class UnoGameUI implements GameView{
 
         // Check if it's the player's turn
         if (this.game.getCurrentPlayer() !== this.humanPlayer) {
-            this.logEvent('info', { message: "It's not your turn!" });
+            this.logEvent('info', {message: "It's not your turn!"});
             return;
         }
 
         // Check if the card can be played
         if (!card.canPlayOn(topCard)) {
-            this.logEvent('info', { message: "You can't play this card!" });
+            this.logEvent('info', {message: "You can't play this card!"});
             return;
         }
 
@@ -385,7 +396,7 @@ class UnoGameUI implements GameView{
         const success = this.game.playCard(card);
 
         if (!success) {
-            this.logEvent('error', { message: "Failed to play the card!" });
+            this.logEvent('error', {message: "Failed to play the card!"});
         }
     }
 
@@ -395,7 +406,7 @@ class UnoGameUI implements GameView{
 
         // Check if it's the player's turn
         if (this.game.getCurrentPlayer() !== this.humanPlayer) {
-            this.logEvent('info', { message: "It's not your turn!" });
+            this.logEvent('info', {message: "It's not your turn!"});
             return;
         }
 
@@ -403,7 +414,7 @@ class UnoGameUI implements GameView{
         const card = this.game.drawCard();
 
         if (!card) {
-            this.logEvent('error', { message: "Failed to draw a card!" });
+            this.logEvent('error', {message: "Failed to draw a card!"});
         }
     }
 
@@ -413,9 +424,9 @@ class UnoGameUI implements GameView{
 
         // Check if the player has UNO
         if (this.humanPlayer.hasUno()) {
-            this.logEvent('info', { message: "You called UNO!" });
+            this.logEvent('info', {message: "You called UNO!"});
         } else {
-            this.logEvent('info', { message: "You don't have UNO!" });
+            this.logEvent('info', {message: "You don't have UNO!"});
         }
     }
 

@@ -1,19 +1,11 @@
 import {Card, WildCard, WildDrawFourCard} from './cards';
-import { Deck, DeckFactory, StandardUNODeckFactory } from './deck';
-import { Player } from './player';
-import { CpuPlayer } from './cpuPlayer'; // Añadido para instanceof
-import { GameState, CardType, CardColor, GameView} from "../types/types";
+import {Deck, DeckFactorySelector} from './deck';
+import {Player} from './player';
+import {CpuPlayer} from './cpuPlayer'; // Añadido para instanceof
+import {CardColor, CardType, DeckType, GameState, GameView} from "../types/types";
+import {Logger} from './logging';
+import {GameEvent} from "../types/types";
 
-export enum GameEvent {
-    GAME_START = 'game_start',
-    TURN_START = 'turn_start',
-    CARD_PLAYED = 'card_played',
-    CARD_DRAWN = 'card_drawn',
-    UNO_CALLED = 'uno_called',
-    DIRECTION_CHANGE = 'direction_change',
-    PLAYER_SKIPPED = 'player_skipped',
-    GAME_END = 'game_end'
-}
 
 export type GameEventListener = (event: GameEvent, data: any) => void;
 
@@ -26,9 +18,8 @@ export class Game implements GameState{
     private players: Player[] = [];
     private currentPlayerIndex: number = 0;
     private direction: Direction = Direction.CLOCKWISE;
-    private deck: Deck;
+    private deck: Deck | undefined;
     private topCard: Card | null = null;
-    private deckFactory: DeckFactory;
     private eventListeners: GameEventListener[] = [];
     private skipFlag: boolean = false;
     private winner: Player | null = null;
@@ -37,12 +28,10 @@ export class Game implements GameState{
 
     constructor(
         players: Player[] = [],
-        deckFactory: DeckFactory = new StandardUNODeckFactory(),
         view: GameView
     ) {
         this.players = players;
-        this.deckFactory = deckFactory;
-        this.deck = this.deckFactory.createDeck();
+        this.setDeck(DeckType.STANDARD);
         this.view = view;
     }
 
@@ -58,6 +47,10 @@ export class Game implements GameState{
     // Event handling
     addEventListener(listener: GameEventListener): void {
         this.eventListeners.push(listener);
+    }
+
+    setDeck(type : DeckType): void {
+        this.deck = DeckFactorySelector.createDeck(type);
     }
 
     removeEventListener(listener: GameEventListener): void {
@@ -81,9 +74,6 @@ export class Game implements GameState{
         if (this.players.length < 2) {
             throw new Error('At least 2 players are required to start the game');
         }
-
-        // Create a new deck
-        this.deck = this.deckFactory.createDeck();
 
         // Deal initial cards to players
         const initialCardCount = 7; // Valor por defecto UNO
@@ -110,8 +100,8 @@ export class Game implements GameState{
 
         // Emit game start event
         this.emitEvent(GameEvent.GAME_START, {
-            players: this.players,
-            topCard: this.topCard
+            players: this.players.map(player => player.toJSON()),
+            topCard: this.topCard?.toJSON()
         });
 
         // Start the first turn
@@ -125,8 +115,8 @@ export class Game implements GameState{
         }
         const currentPlayer = this.getCurrentPlayer();
         this.emitEvent(GameEvent.TURN_START, {
-            player: currentPlayer,
-            topCard: this.topCard
+            player: currentPlayer.toJSON(),
+            topCard: this.topCard?.toJSON()
         });
 
         // Si es CPU y el juego no ha terminado, que haga su movimiento.
@@ -159,8 +149,8 @@ export class Game implements GameState{
         this.topCard = playedCard;
 
         this.emitEvent(GameEvent.CARD_PLAYED, {
-            player: currentPlayer,
-            card: playedCard
+            player: currentPlayer.toJSON(),
+            card: playedCard.toJSON()
         });
 
         // Si es una WildCard y su color aún es CardColor.WILD (esperando selección de modal humano),
@@ -175,9 +165,10 @@ export class Game implements GameState{
         }
         if (currentPlayer.hasUno()) {
             this.emitEvent(GameEvent.UNO_CALLED, {
-                player: currentPlayer
+                player: currentPlayer.toJSON()
             });
         }
+        Logger.getInstance().log(JSON.stringify(playedCard.toJSON()))
         this.nextTurn();
         return true;
     }
@@ -204,7 +195,7 @@ export class Game implements GameState{
         }
         if (currentPlayer.hasUno()) {
             this.emitEvent(GameEvent.UNO_CALLED, {
-                player: currentPlayer
+                player: currentPlayer.toJSON(),
             });
         }
         this.nextTurn();
@@ -230,8 +221,8 @@ export class Game implements GameState{
 
             // Notifica a los observadores sobre la carta robada
             this.emitEvent(GameEvent.CARD_DRAWN, {
-                player: currentPlayer,
-                card: card
+                player: currentPlayer.toJSON(),
+                card: card.toJSON()
             });
 
             // Si la carta robada no se puede jugar, pasa el turno
@@ -249,7 +240,7 @@ export class Game implements GameState{
     skipNextPlayer(n : number): void {
         this.getNextPlayer().addSkippedTurns(n);
         this.emitEvent(GameEvent.PLAYER_SKIPPED, {
-            player: this.getNextPlayer()
+            player: this.getNextPlayer().toJSON()
         });
     }
 
@@ -269,8 +260,8 @@ export class Game implements GameState{
         nextPlayer.addCards(cards);
 
         this.emitEvent(GameEvent.CARD_DRAWN, {
-            player: nextPlayer,
-            cards: cards,
+            player: nextPlayer.toJSON(),
+            cards: cards.map(card => card.toJSON()),
             count: count
         });
     }
@@ -294,7 +285,7 @@ export class Game implements GameState{
         let nextIndex = (this.currentPlayerIndex + this.direction + this.players.length) % this.players.length;
 
         while (this.players[nextIndex].consumeSkippedTurn()) {
-            this.emitEvent(GameEvent.PLAYER_SKIPPED, { player: this.players[nextIndex] });
+            this.emitEvent(GameEvent.PLAYER_SKIPPED, { player: this.players[nextIndex].toJSON() });
             nextIndex = (nextIndex + this.direction + this.players.length) % this.players.length;
         }
 
@@ -334,7 +325,7 @@ export class Game implements GameState{
             }
 
             this.emitEvent(GameEvent.GAME_END, {
-                winner: winner,
+                winner: winner.toJSON(),
                 score: score
             });
 
@@ -374,7 +365,7 @@ export class Game implements GameState{
 
     // Reset the game to start a new round
     reset(): void {
-        this.deck = this.deckFactory.createDeck();
+        this.deck = this.setDeck(DeckType.STANDARD);
         this.topCard = null;
         this.currentPlayerIndex = 0;
         this.direction = Direction.CLOCKWISE;

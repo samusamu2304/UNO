@@ -1,5 +1,20 @@
-import {CardColor} from '../types/types';
+import {CardColor, DeckType} from '../types/types';
 import {Card, DrawTwoCard, NumberCard, ReverseCard, SkipCard, SkipTwoCard, WildCard, WildDrawFourCard} from './cards';
+
+export class DeckFactorySelector {
+    static createDeck(type: DeckType): Deck {
+        switch (type) {
+            case DeckType.STANDARD:
+                return new StandardUNODeckFactory().createDeck();
+            case DeckType.SMALL:
+                return new SmallUNODeckFactory().createDeck();
+            case DeckType.MWILD:
+                return new mostlyWildDeckFactory().createDeck();
+            default:
+                throw new Error('Tipo de baraja no soportado: ' + type);
+        }
+    }
+}
 
 export interface DeckFactory {
     createDeck(): Deck;

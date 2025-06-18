@@ -56,6 +56,13 @@ export class Player {
         }
         return false; // No skipped turns to consume
     }
+    toJSON(): object {
+        return {
+            name: this.name,
+            hand: this.hand.map(card => card.toJSON()), // Convert each card to JSON
+            skippedTurns: this.skippedTurns
+        };
+    }
 
     // Find a card in the player's hand that can be played on the top card
     findPlayableCard(topCard: Card): Card | null {
